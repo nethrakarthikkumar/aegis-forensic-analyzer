@@ -18,8 +18,5 @@ public class FileRecord {
     public long getFileSize() { return fileSize; }
     public String getStatus() { return status; }
 
-    @Override
-    public String toString() {
-        return String.format("[%s] %s | Size: %d bytes | Hash: %s", status, filePath, fileSize, fileHash);
-    }
+    public void setStatus(String status) { this.status = status; }
 }

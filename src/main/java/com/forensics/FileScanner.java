@@ -1,40 +1,75 @@
 package com.forensics;
 
 import java.io.File;
-import java.util.ArrayList;
-import java.util.List;
+import java.util.*;
 
 public class FileScanner {
 
-    public List<FileRecord> scanDirectory(String targetPath) {
-        List<FileRecord> records = new ArrayList<>();
-        File rootDir = new File(targetPath);
+    private static final Set<String> SUSPICIOUS_EXTENSIONS = new HashSet<>(
+        Arrays.asList(".exe", ".bat", ".vbs", ".sh", ".ps1", ".dll", ".cmd")
+    );
 
-        if (!rootDir.exists() || !rootDir.isDirectory()) {
-            System.err.println("Invalid directory path: " + targetPath);
+    public List<FileRecord> scanDirectory(String pathStr) {
+        List<FileRecord> records = new ArrayList<>();
+        File target = new File(pathStr);
+
+        if (!target.exists()) {
             return records;
         }
 
-        traverseAndScan(rootDir, records);
+        if (target.isFile()) {
+            processSingleFile(target, records);
+        } else if (target.isDirectory()) {
+            scanRecursive(target, records);
+        }
+
+        markDuplicates(records);
         return records;
     }
 
-    private void traverseAndScan(File file, List<FileRecord> records) {
-        File[] files = file.listFiles();
-        if (files == null) return;
-
-        for (File f : files) {
-            if (f.isDirectory()) {
-                traverseAndScan(f, records);
-            } else {
-                String status = "NORMAL";
-                if (f.isHidden() || f.getName().startsWith(".")) {
-                    status = "SUSPICIOUS_HIDDEN";
+    private void scanRecursive(File dir, List<FileRecord> records) {
+        File[] files = dir.listFiles();
+        if (files != null) {
+            for (File file : files) {
+                if (file.isDirectory()) {
+                    scanRecursive(file, records);
+                } else {
+                    processSingleFile(file, records);
                 }
+            }
+        }
+    }
 
-                String hash = HashUtils.calculateSHA256(f.getAbsolutePath());
-                FileRecord record = new FileRecord(f.getAbsolutePath(), hash, f.length(), status);
-                records.add(record);
+    private void processSingleFile(File file, List<FileRecord> records) {
+        String hash = HashUtils.calculateSHA256(file.getAbsolutePath());
+        String name = file.getName().toLowerCase();
+
+        boolean isSuspicious = SUSPICIOUS_EXTENSIONS.stream().anyMatch(name::endsWith);
+        String status = "CLEAN";
+
+        if (file.isHidden()) {
+            status = "HIDDEN";
+        } else if (isSuspicious) {
+            status = "SUSPICIOUS";
+        }
+
+        records.add(new FileRecord(file.getAbsolutePath(), hash, file.length(), status));
+    }
+
+    private void markDuplicates(List<FileRecord> records) {
+        Map<String, List<FileRecord>> hashMap = new HashMap<>();
+
+        for (FileRecord rec : records) {
+            hashMap.computeIfAbsent(rec.getFileHash(), k -> new ArrayList<>()).add(rec);
+        }
+
+        for (Map.Entry<String, List<FileRecord>> entry : hashMap.entrySet()) {
+            if (entry.getValue().size() > 1) {
+                for (FileRecord rec : entry.getValue()) {
+                    if ("CLEAN".equals(rec.getStatus())) {
+                        rec.setStatus("DUPLICATE");
+                    }
+                }
             }
         }
     }
