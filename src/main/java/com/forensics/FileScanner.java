@@ -5,9 +5,17 @@ import java.util.*;
 
 public class FileScanner {
 
-    private static final Set<String> SUSPICIOUS_EXTENSIONS = new HashSet<>(
-        Arrays.asList(".exe", ".bat", ".vbs", ".sh", ".ps1", ".dll", ".cmd")
-    );
+    private static final Map<String, String> THREAT_TYPES = new LinkedHashMap<>();
+
+    static {
+        THREAT_TYPES.put(".exe", "Windows executable program");
+        THREAT_TYPES.put(".dll", "Windows library (DLL)");
+        THREAT_TYPES.put(".bat", "Windows batch script");
+        THREAT_TYPES.put(".cmd", "Windows command script");
+        THREAT_TYPES.put(".vbs", "VBScript (Visual Basic script)");
+        THREAT_TYPES.put(".ps1", "PowerShell script");
+        THREAT_TYPES.put(".sh", "Linux shell script");
+    }
 
     public List<FileRecord> scanDirectory(String pathStr) {
         List<FileRecord> records = new ArrayList<>();
@@ -44,16 +52,31 @@ public class FileScanner {
         String hash = HashUtils.calculateSHA256(file.getAbsolutePath());
         String name = file.getName().toLowerCase();
 
-        boolean isSuspicious = SUSPICIOUS_EXTENSIONS.stream().anyMatch(name::endsWith);
+        String threatType = null;
+        for (Map.Entry<String, String> entry : THREAT_TYPES.entrySet()) {
+            if (name.endsWith(entry.getKey())) {
+                threatType = entry.getValue();
+                break;
+            }
+        }
+
         String status = "CLEAN";
 
         if (file.isHidden()) {
             status = "HIDDEN";
-        } else if (isSuspicious) {
+        } else if (threatType != null) {
             status = "SUSPICIOUS";
         }
 
-        records.add(new FileRecord(file.getAbsolutePath(), hash, file.length(), status));
+        FileRecord record = new FileRecord(file.getAbsolutePath(), hash, file.length(), status);
+
+        if (threatType != null) {
+            record.setThreatType(threatType);
+        } else if (file.isHidden()) {
+            record.setThreatType("Hidden file");
+        }
+
+        records.add(record);
     }
 
     private void markDuplicates(List<FileRecord> records) {
@@ -68,6 +91,7 @@ public class FileScanner {
                 for (FileRecord rec : entry.getValue()) {
                     if ("CLEAN".equals(rec.getStatus())) {
                         rec.setStatus("DUPLICATE");
+                        rec.setThreatType("Duplicate file");
                     }
                 }
             }

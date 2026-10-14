@@ -94,7 +94,11 @@ public class MainView extends Application {
         hashCol.setCellValueFactory(cell -> new SimpleStringProperty(cell.getValue().getFileHash()));
         hashCol.setPrefWidth(300);
 
-        table.getColumns().addAll(statusCol, pathCol, sizeCol, hashCol);
+        TableColumn<FileRecord, String> threatCol = new TableColumn<>("Threat Type");
+        threatCol.setCellValueFactory(cell -> new SimpleStringProperty(cell.getValue().getThreatType()));
+        threatCol.setPrefWidth(200);
+
+        table.getColumns().addAll(statusCol, threatCol, pathCol, sizeCol, hashCol);
         table.setItems(data);
 
         BorderPane layout = new BorderPane();
@@ -102,6 +106,7 @@ public class MainView extends Application {
         layout.setCenter(table);
 
         Scene scene = new Scene(layout, 950, 500);
+        scene.getStylesheets().add(getClass().getResource("/style.css").toExternalForm());
         primaryStage.setScene(scene);
         primaryStage.show();
     }
